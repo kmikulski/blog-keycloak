@@ -17,8 +17,11 @@ class QueryAPI extends Component {
   }
 
   handleClick = () => {
-    fetch('https://jsonplaceholder.typicode.com/todos/1')
-      .then(response => {
+    fetch('https://jsonplaceholder.typicode.com/todos/1', {
+      headers: {
+        "Authorization": "Bearer " + this.props.keycloak.token
+      }
+    }).then(response => {
         if (response.status === 200)
           return response.json();
         else
