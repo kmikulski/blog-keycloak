@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import QueryAPI from './QueryAPI';
 
 class Welcome extends Component {
 
@@ -6,6 +7,7 @@ class Welcome extends Component {
     return (
       <div className="Welcome">
         <p>This is your public-facing component.</p>
+        <QueryAPI/>
       </div>
     );
   }

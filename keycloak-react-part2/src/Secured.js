@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import UserInfo from './UserInfo';
 import Logout from './Logout';
+import QueryAPI from './QueryAPI';
 import Keycloak from 'keycloak-js';
 
 class Secured extends Component {
@@ -27,6 +28,7 @@ class Secured extends Component {
           </p>
           <UserInfo keycloak={this.state.keycloak} />
           <Logout keycloak={this.state.keycloak} />
+          <QueryAPI/>
         </div>
       ); else return (<div>Unable to authenticate!</div>)
     }
