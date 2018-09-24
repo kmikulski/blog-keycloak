@@ -12,7 +12,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import io.scalac.UserRegistryActor.GetUsers
 
-trait UserRoutes extends JsonSupport {
+trait UserRoutes extends JsonSupport with AuthorizationHandler {
 
   implicit def system: ActorSystem
 
@@ -24,7 +24,9 @@ trait UserRoutes extends JsonSupport {
 
   lazy val userRoutes: Route =
     path("users") {
-      val resultF = (userRegistryActor ? GetUsers).mapTo[Users]
-      onSuccess(resultF)(u => complete(u))
+      authorize { token =>
+        val resultF = (userRegistryActor ? GetUsers).mapTo[Users]
+        onSuccess(resultF)(u => complete(u))
+      }
     }
 }

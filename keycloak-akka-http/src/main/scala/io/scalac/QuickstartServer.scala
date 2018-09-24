@@ -3,10 +3,11 @@ package io.scalac
 import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration.Duration
 import scala.util.{ Failure, Success }
-
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.directives.RouteDirectives.complete
+import akka.http.scaladsl.server.{ AuthorizationFailedRejection, RejectionHandler, Route }
 import akka.stream.ActorMaterializer
 
 object QuickstartServer extends App with UserRoutes with CORSHandler {
@@ -16,6 +17,10 @@ object QuickstartServer extends App with UserRoutes with CORSHandler {
   implicit val executionContext: ExecutionContext = system.dispatcher
 
   val userRegistryActor: ActorRef = system.actorOf(UserRegistryActor.props, "userRegistryActor")
+
+  implicit def rejectionHandler: RejectionHandler = RejectionHandler.newBuilder().handle {
+    case AuthorizationFailedRejection => complete(StatusCodes.Unauthorized -> None)
+  }.result().mapRejectionResponse(addCORSHeaders)
 
   lazy val routes: Route = corsHandler(userRoutes)
 
