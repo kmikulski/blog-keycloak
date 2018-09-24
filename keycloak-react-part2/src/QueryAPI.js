@@ -16,12 +16,17 @@ class QueryAPI extends Component {
     this.state = { response: null };
   }
 
-  handleClick = () => {
-    fetch('https://jsonplaceholder.typicode.com/todos/1', {
+  authorizationHeader() {
+    if(this.props.keycloak) return {
       headers: {
         "Authorization": "Bearer " + this.props.keycloak.token
       }
-    }).then(response => {
+    }; else return {};
+  }
+
+  handleClick = () => {
+    fetch('http://localhost:9000/users', this.authorizationHeader())
+      .then(response => {
         if (response.status === 200)
           return response.json();
         else
