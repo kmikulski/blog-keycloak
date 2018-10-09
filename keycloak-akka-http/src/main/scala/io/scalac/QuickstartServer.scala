@@ -12,17 +12,17 @@ import akka.stream.ActorMaterializer
 
 object QuickstartServer extends App with UserRoutes with CORSHandler {
 
-  implicit val system: ActorSystem = ActorSystem("helloAkkaHttpServer")
-  implicit val materializer: ActorMaterializer = ActorMaterializer()
-  implicit val executionContext: ExecutionContext = system.dispatcher
-
-  val userRegistryActor: ActorRef = system.actorOf(UserRegistryActor.props, "userRegistryActor")
-
   implicit def rejectionHandler: RejectionHandler = RejectionHandler.newBuilder().handle {
     case AuthorizationFailedRejection => complete(StatusCodes.Unauthorized -> None)
   }.result().mapRejectionResponse(addCORSHeaders)
 
   lazy val routes: Route = corsHandler(userRoutes)
+
+  implicit val system: ActorSystem = ActorSystem("helloAkkaHttpServer")
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val executionContext: ExecutionContext = system.dispatcher
+
+  val userRegistryActor: ActorRef = system.actorOf(UserRegistryActor.props, "userRegistryActor")
 
   val serverBinding: Future[Http.ServerBinding] = Http().bindAndHandle(routes, "localhost", 9000)
 

@@ -19,7 +19,7 @@ class UserRegistryActor extends Actor with ActorLogging {
   import UserRegistryActor._
 
   var users = Set(
-    User("Marek", 31, "Poland"),
+    User("Grzegorz", 31, "Poland"),
     User("Thomas", 28, "United Kingdom"))
 
   def receive: Receive = {
