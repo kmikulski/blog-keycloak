@@ -14,7 +14,7 @@ import io.scalac.UserRegistryActor.GetUsers
 
 trait UserRoutes extends JsonSupport with AuthorizationHandler {
 
-  implicit def system: ActorSystem
+  implicit val system: ActorSystem
 
   lazy val log = Logging(system, classOf[UserRoutes])
 

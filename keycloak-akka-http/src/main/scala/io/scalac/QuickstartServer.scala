@@ -9,8 +9,12 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.RouteDirectives.complete
 import akka.http.scaladsl.server.{ AuthorizationFailedRejection, RejectionHandler, Route }
 import akka.stream.ActorMaterializer
+import org.keycloak.adapters.KeycloakDeploymentBuilder
 
 object QuickstartServer extends App with UserRoutes with CORSHandler {
+
+  override val keycloakDeployment = KeycloakDeploymentBuilder.build(
+    getClass.getResourceAsStream("/keycloak.json"))
 
   implicit def rejectionHandler: RejectionHandler = RejectionHandler.newBuilder().handle {
     case AuthorizationFailedRejection => complete(StatusCodes.Unauthorized -> None)
@@ -28,6 +32,7 @@ object QuickstartServer extends App with UserRoutes with CORSHandler {
 
   serverBinding.onComplete {
     case Success(bound) =>
+      println(s"certificate registry URL: ${keycloakDeployment.getJwksUrl}")
       println(s"Server online at http://${bound.localAddress.getHostString}:${bound.localAddress.getPort}/")
     case Failure(e) =>
       Console.err.println(s"Server could not start!")
