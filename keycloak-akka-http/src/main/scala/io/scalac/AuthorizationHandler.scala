@@ -1,8 +1,8 @@
 package io.scalac
 
 import java.math.BigInteger
-import java.security.{ KeyFactory, PublicKey }
 import java.security.spec.RSAPublicKeySpec
+import java.security.{ KeyFactory, PublicKey }
 import java.util.Base64
 
 import akka.actor.ActorSystem
@@ -11,18 +11,18 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.OAuth2BearerToken
+import akka.http.scaladsl.server.Directives.{ extractCredentials, onComplete, provide, reject }
 import akka.http.scaladsl.server.{ AuthorizationFailedRejection, Directive1 }
-import akka.http.scaladsl.server.Directives.{ extractCredentials, onSuccess, provide, reject }
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.ActorMaterializer
 import org.keycloak.RSATokenVerifier
-import org.keycloak.adapters.KeycloakDeployment
-import org.keycloak.common.VerificationException
-import org.keycloak.jose.jws.{ AlgorithmType, JWSHeader }
+import org.keycloak.adapters.{ KeycloakDeployment, KeycloakDeploymentBuilder }
+import org.keycloak.jose.jws.AlgorithmType
 import org.keycloak.representations.AccessToken
-import spray.json.{ DefaultJsonProtocol, JsObject }
+import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.Success
 
 trait AuthorizationHandler extends SprayJsonSupport with DefaultJsonProtocol {
 
@@ -30,16 +30,15 @@ trait AuthorizationHandler extends SprayJsonSupport with DefaultJsonProtocol {
   implicit def materializer: ActorMaterializer
   implicit def system: ActorSystem
 
-  def keycloakDeployment: KeycloakDeployment
   def log: LoggingAdapter
 
-  def authorize: Directive1[String] =
+  def authorize: Directive1[AccessToken] =
     extractCredentials.flatMap {
       case Some(OAuth2BearerToken(token)) =>
-        onSuccess(verifyToken(token)).flatMap {
-          case true =>
-            provide(token)
-          case false =>
+        onComplete(verifyToken(token)).flatMap {
+          case Success(Some(t)) =>
+            provide(t)
+          case _ =>
             log.warning(s"token $token is not valid")
             reject(AuthorizationFailedRejection)
         }
@@ -48,19 +47,25 @@ trait AuthorizationHandler extends SprayJsonSupport with DefaultJsonProtocol {
         reject(AuthorizationFailedRejection)
     }
 
-  private def verifyToken(token: String): Future[Boolean] = Future(true)
-
-  private def verifyToken2(token: String): Future[AccessToken] = {
+  def verifyToken(token: String): Future[Option[AccessToken]] = {
+    val tokenVerifier = RSATokenVerifier.create(token).realmUrl(keycloakDeployment.getRealmInfoUrl)
     for {
-      tokenVerifier <- Future(RSATokenVerifier.create(token).realmUrl(keycloakDeployment.getRealmInfoUrl))
-      publicKey <- getPublicKey(tokenVerifier.getHeader)
+      publicKey <- publicKeys.map(_.get(tokenVerifier.getHeader.getKeyId))
     } yield publicKey match {
-      case Some(publicKey) =>
-        tokenVerifier.publicKey(publicKey).verify().getToken
+      case Some(pk) =>
+        val token = tokenVerifier.publicKey(pk).verify().getToken
+        Some(token)
       case None =>
-        throw new VerificationException("No matching public key found.")
+        log.warning(s"no public key found for id ${tokenVerifier.getHeader.getKeyId}")
+        None
     }
   }
+
+  val keycloakDeployment: KeycloakDeployment =
+    KeycloakDeploymentBuilder.build(getClass.getResourceAsStream("/keycloak.json"))
+
+  def getVerifier(token: String): Future[RSATokenVerifier] =
+    Future(RSATokenVerifier.create(token).realmUrl(keycloakDeployment.getRealmInfoUrl))
 
   case class Keys(keys: Seq[KeyData])
   case class KeyData(kid: String, n: String, e: String)
@@ -68,11 +73,10 @@ trait AuthorizationHandler extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val keyDataFormat = jsonFormat3(KeyData)
   implicit val keysFormat = jsonFormat1(Keys)
 
-  private def getPublicKey(jwsHeader: JWSHeader): Future[Option[PublicKey]] = {
+  lazy val publicKeys: Future[Map[String, PublicKey]] =
     Http().singleRequest(HttpRequest(uri = keycloakDeployment.getJwksUrl)).flatMap(response => {
-      Unmarshal(response).to[Keys].map(_.keys.find(_.kid == jwsHeader.getKeyId).map(generateKey))
+      Unmarshal(response).to[Keys].map(_.keys.map(k => (k.kid, generateKey(k))).toMap)
     })
-  }
 
   private def generateKey(keyData: KeyData): PublicKey = {
     val keyFactory = KeyFactory.getInstance(AlgorithmType.RSA.toString)
