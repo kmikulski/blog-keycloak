@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 
 class APIResponse extends Component {
   render() {
-    if(this.props.response == null)
+    if(!this.props.response)
       return (<div/>);
     else
       return ( <pre>{this.props.response}</pre> );
@@ -17,11 +17,12 @@ class QueryAPI extends Component {
   }
 
   authorizationHeader() {
-    if(this.props.keycloak) return {
+    if(!this.props.keycloak) return {};
+    return {
       headers: {
         "Authorization": "Bearer " + this.props.keycloak.token
       }
-    }; else return {};
+    };
   }
 
   handleClick = () => {
